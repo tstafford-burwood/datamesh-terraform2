@@ -1,0 +1,11 @@
+#--------------------------
+# PROJECT IAM MEMBER MODULE
+#--------------------------
+
+module "project_iam_member" {
+    source = "./modules/iam/project_iam"
+
+    project_id            = var.project_id
+    project_member        = var.project_member
+    project_iam_role_list = var.project_iam_role_list
+}

@@ -1,0 +1,26 @@
+#--------------------------
+# VPC CLOUD FIREWALL TFVARS
+#--------------------------
+
+custom_rules = {
+  smtp-egress = {
+    description          = ""
+    direction            = "EGRESS"
+    action               = "allow"
+    ranges               = [X.X.X.X/X]
+    sources              = ["spam-tag"]
+    targets              = ["foo-tag", "egg-tag"]
+    use_service_accounts = false
+    rules = [
+      {
+        protocol = "tcp"
+        ports    = ["<PORT NUMBER>"]
+      }
+    ]
+    extra_attributes = {
+      "disabled" : false
+      "priority" : 1000
+    }
+    flow_logs_metadata = "INCLUDE_ALL_METADATA"
+  }
+}

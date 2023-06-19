@@ -1,0 +1,7 @@
+#--------------------------
+# PROJECT IAM MEMBER TFVARS
+#--------------------------
+
+project_id            = ""
+project_member        = ""
+project_iam_role_list = []

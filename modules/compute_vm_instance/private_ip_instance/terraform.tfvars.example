@@ -1,0 +1,39 @@
+#----------------------------------------
+# SINGLE VM INSTANCE - PRIVATE IP TFVARS
+#----------------------------------------
+
+allow_stopping_for_update = true
+vm_description            = "VM created with Terraform"
+desired_status            = "RUNNING"
+deletion_protection       = false
+
+labels = {}
+
+metadata = {}
+
+machine_type = ""
+name         = ""
+zone         = ""
+
+// BOOT DISK
+
+initialize_params = [
+  {
+    vm_disk_size  = 50
+    vm_disk_type  = "pd-balanced"
+    vm_disk_image = "centos-cloud/centos-8-v20210512"
+  }
+]
+
+auto_delete_disk = true
+
+// SERVICE ACCOUNT
+
+service_account_email  = ""
+service_account_scopes = "cloud-platform"
+
+// SHIELDED INSTANCE CONFIG
+
+enable_secure_boot          = false
+enable_vtpm                 = true
+enable_integrity_monitoring = true

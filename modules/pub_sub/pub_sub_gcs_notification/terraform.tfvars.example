@@ -1,0 +1,15 @@
+#--------------------------------
+# PUB/SUB GCS NOTIFICATION TFVARS
+#--------------------------------
+
+// REQUIRED TFVARS
+
+bucket_name    = ""
+payload_format = ""
+pub_sub_topic  = ""
+
+// OPTIONAL TFVARS
+
+custom_attributes  = {}
+event_types        = []
+object_name_prefix = null

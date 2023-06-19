@@ -1,0 +1,10 @@
+#------------------------------------
+# ARTIFACT REGISTRY REPOSITORY TFVARS
+#------------------------------------
+
+artifact_repository_project_id  = ""
+artifact_repository_name        = ""
+artifact_repository_format      = ""
+artifact_repository_location    = ""
+artifact_repository_description = "Artifact Registry Repository created with Terraform"
+artifact_repository_labels      = {}

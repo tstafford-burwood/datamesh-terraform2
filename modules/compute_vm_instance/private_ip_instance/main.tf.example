@@ -1,0 +1,37 @@
+module "single_vm_instance_private_ip" {
+  source = "./modules/compute_vm_instance/private_ip_instance"
+
+  allow_stopping_for_update = var.allow_stopping_for_update
+  vm_description            = var.vm_description
+  desired_status            = var.desired_status
+  deletion_protection       = var.deletion_protection
+  labels                    = var.labels
+  metadata                  = var.metadata
+  metadata_startup_script   = var.metadata_startup_script
+  project_id                = module.researcher-workspace-project.project_id
+  machine_type              = var.machine_type
+  name                      = var.name
+  tags                      = var.tags
+  zone                      = var.zone
+
+  // BOOT DISK 
+
+  initialize_params = var.initialize_params
+  auto_delete_disk  = var.auto_delete_disk
+
+  // NETWORK INTERFACE
+
+  subnetwork         = module.vpc.subnets_self_links
+  network_ip         = "" // KEEP AS AN EMPTY STRING FOR AN AUTOMATICALLY ASSIGNED PRIVATE IP
+
+  // SERVICE ACCOUNT
+
+  service_account_email  = var.service_account_email
+  service_account_scopes = var.service_account_scopes
+
+  // SHIELDED INSTANCE CONFIG
+  
+  enable_secure_boot          = var.enable_secure_boot
+  enable_vtpm                 = var.enable_vtpm
+  enable_integrity_monitoring = var.enable_integrity_monitoring
+}

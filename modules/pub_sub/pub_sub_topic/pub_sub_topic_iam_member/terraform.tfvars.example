@@ -1,0 +1,8 @@
+#--------------------------------
+# PUB/SUB TOPIC IAM MEMBER TFVARS
+#--------------------------------
+
+project_id = ""
+topic_name = ""
+iam_member = ""
+role       = ""

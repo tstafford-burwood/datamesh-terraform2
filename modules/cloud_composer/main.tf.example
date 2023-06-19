@@ -1,0 +1,40 @@
+#-----------------------
+# CLOUD COMPOSER MODULE
+#-----------------------
+
+module "cloud_composer" {
+  source = "./modules/cloud_composer"
+
+  // REQUIRED
+  composer_env_name = var.composer_env_name
+  network           = var.network
+  project_id        = var.project_id
+  subnetwork        = var.subnetwork
+
+  // OPTIONAL
+  airflow_config_overrides         = var.airflow_config_overrides
+  cloud_sql_ipv4_cidr              = var.cloud_sql_ipv4_cidr
+  composer_service_account         = var.composer_service_account
+  disk_size                        = var.disk_size
+  enable_private_endpoint          = var.enable_private_endpoint
+  env_variables                    = var.env_variables
+  image_version                    = var.image_version
+  labels                           = var.labels
+  machine_type                     = var.machine_type
+  master_ipv4_cidr                 = var.master_ipv4_cidr
+  node_count                       = var.node_count
+  oauth_scopes                     = var.oauth_scopes
+  pod_ip_allocation_range_name     = var.pod_ip_allocation_range_name
+  pypi_packages                    = var.pypi_packages
+  python_version                   = var.python_version
+  region                           = var.region
+  service_ip_allocation_range_name = var.service_ip_allocation_range_name
+  tags                             = var.tags
+  use_ip_aliases                   = var.use_ip_aliases
+  web_server_ipv4_cidr             = var.web_server_ipv4_cidr
+  zone                             = var.zone
+
+  // SHARED VPC SUPPORT
+  network_project_id = var.network_project_id
+  subnetwork_region  = var.subnetwork_region
+}

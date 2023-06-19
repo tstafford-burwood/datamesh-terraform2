@@ -1,0 +1,11 @@
+#--------------------------
+# FOLDER IAM MEMBER MODULE
+#--------------------------
+
+module "folder_iam_member" {
+    source = "./modules/iam/folder_iam"
+
+    folder_id       = var.folder_id
+    iam_role_list   = var.iam_role_list
+    folder_member   = var.folder_member
+}

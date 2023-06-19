@@ -1,0 +1,12 @@
+#--------------------------
+# VPC CLOUD FIREWALL MODULE
+#--------------------------
+
+module "vpc_firewall" {
+  
+  source = "./firewall"
+  
+  custom_rules = var.custom_rules
+  network      = var.network
+  project_id   = var.project_id
+}

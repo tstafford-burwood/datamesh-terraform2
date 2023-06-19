@@ -1,0 +1,24 @@
+#-----------------
+# CLOUD DNS MODULE
+#-----------------
+
+module "cloud-dns" {
+  source  = "./modules/cloud_dns"
+
+  // REQUIRED
+  cloud_dns_domain     = var.cloud_dns_domain
+  cloud_dns_name       = var.cloud_dns_name
+  cloud_dns_project_id = var.cloud_dns_project_id
+
+  // OPTIONAL
+  default_key_specs_key              = var.default_key_specs_key
+  default_key_specs_zone             = var.default_key_specs_zone
+  cloud_dns_description              = var.cloud_dns_description
+  dnssec_config                      = var.dnssec_config
+  cloud_dns_labels                   = var.cloud_dns_labels
+  private_visibility_config_networks = var.private_visibility_config_networks
+  cloud_dns_recordsets               = var.cloud_dns_recordsets
+  target_name_server_addresses       = var.target_name_server_addresses
+  cloud_dns_target_network           = var.cloud_dns_target_network
+  cloud_dns_zone_type                = var.cloud_dns_zone_type
+}

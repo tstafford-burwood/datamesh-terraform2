@@ -1,0 +1,17 @@
+// USED TO SET THE IAM ROLE TO A PROJECT'S GCS SERVICE ACCOUNT
+// ENABLES PUBLISHING TO A PUB/SUB TOPIC
+
+#--------------------------------
+# PUB/SUB TOPIC IAM MEMBER MODULE
+#--------------------------------
+
+module "pub_sub_topic_iam_binding" {
+  source = "./modules/pub_sub/pub_sub_topic/pub_sub_topic_iam_member"
+
+  // REQUIRED
+
+  project_id = var.project_id
+  topic_name = var.topic_name
+  iam_member = var.iam_member
+  role       = var.role
+}

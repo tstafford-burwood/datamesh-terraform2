@@ -1,0 +1,137 @@
+# ---------------------------------------
+# This file is a collection of all the destroy triggers for foundation, cloud composer, and researchers
+# The file is used to easily deploy these dangerous triggers and to quickly remove them from
+# cloud build by renamming the file to `triggers-destroy.tf.example` to help remove
+# all the destroy triggers
+# ---------------------------------------
+# ---------------------------------------
+# FOUNDATION TRIGGERS
+# ---------------------------------------
+
+resource "google_cloudbuild_trigger" "foundation_destroy_triggers" {
+  # Loop through the map of foundation_triggers to build out the destroy triggers
+  for_each = local.foundation_triggers
+
+  project = local.automation_project_id
+  name    = format("%s-%s-destroy", local.environment[terraform.workspace], each.key)
+
+  disabled       = true
+  filename       = format("%s-destroy.yaml", each.value)
+  included_files = formatlist("environment/foundation/%s/env/%s.tfvars", substr(each.key, 3, 15), local.included_files)
+
+  github {
+    owner = var.github_owner
+    name  = var.github_repo_name
+    push {
+      invert_regex = false
+      branch       = var.branch_name
+    }
+  }
+
+  substitutions = {
+    _BUCKET      = local.terraform_state_bucket
+    _PREFIX      = format("%s", local.terraform_foundation_state_prefix)
+    _TAG         = local.terraform_container_version
+    _TFVARS_FILE = local.included_files
+  }
+}
+
+
+resource "google_cloudbuild_trigger" "workflow_destroy_triggers" {
+  project = local.automation_project_id
+  name    = format("%s-%s-destroy", local.environment[terraform.workspace], "sde-workflow-foundation")
+
+  disabled = true
+  filename = format("%s-destroy.yaml", "cloudbuild/foundation/workflow-foundation")
+
+  # There has to be a better way of adding these included files
+  included_files = [
+    "environment/foundation/folders/env/${local.included_files}.tfvars",
+    "environment/foundation/data-ingress/env/${local.included_files}.tfvars",
+    "environment/foundation/image/env/${local.included_files}.tfvars",
+    "environment/foundation/data-ops/env/${local.included_files}.tfvars",
+    "environment/foundation/data-lake/env/${local.included_files}.tfvars",
+    "environment/foundation/vpc-sc/env/${local.included_files}.tfvars",
+  ]
+
+  github {
+    owner = var.github_owner
+    name  = var.github_repo_name
+    push {
+      invert_regex = false
+      branch       = var.branch_name
+    }
+  }
+
+  substitutions = {
+    _BUCKET      = local.terraform_state_bucket
+    _PREFIX      = format("%s", local.terraform_foundation_state_prefix)
+    _TAG         = local.terraform_container_version
+    _TFVARS_FILE = local.included_files
+  }
+}
+
+# ---------------------------------------
+# COMPOSER TRIGGERS
+# ---------------------------------------
+
+resource "google_cloudbuild_trigger" "composer_destroy_triggers" {
+  project = local.automation_project_id
+  name    = format("%s-%s-destroy", local.environment[terraform.workspace], "sde-composer")
+
+  disabled       = true
+  filename       = format("%s-destroy.yaml", "cloudbuild/foundation/composer")
+  included_files = formatlist("environment/foundation/data-ops/composer/env/%s.tfvars", local.included_files)
+
+  github {
+    owner = var.github_owner
+    name  = var.github_repo_name
+    push {
+      invert_regex = false
+      branch       = var.branch_name
+    }
+  }
+
+  substitutions = {
+    _BUCKET      = local.terraform_state_bucket
+    _PREFIX      = format("%s", local.terraform_foundation_state_prefix)
+    _TAG         = local.terraform_container_version
+    _TFVARS_FILE = local.included_files
+  }
+}
+
+# ---------------------------------------
+# RESEARCHER TRIGGERS
+# ---------------------------------------
+
+resource "google_cloudbuild_trigger" "researcher_destroy_triggers" {
+  for_each = local.researcher_triggers
+
+  project = local.automation_project_id
+  name    = format("%s-%s-destroy", local.environment[terraform.workspace], each.key)
+
+  disabled = true
+  filename = format("%s-destroy.yaml", "cloudbuild/deployments/researcher-workspace-project")
+  included_files = [
+    format("environment/deployments/researcher-projects/env/%s/egress/%s.tfvars", each.value, local.included_files),
+    format("environment/deployments/researcher-projects/env/%s/workspace/%s.tfvars", each.value, local.included_files)
+  ]
+
+  github {
+    owner = var.github_owner
+    name  = var.github_repo_name
+    push {
+      invert_regex = false
+      branch       = var.branch_name
+    }
+  }
+
+  substitutions = {
+    _BUCKET            = local.terraform_state_bucket
+    _PREFIX            = "deployments"
+    _PREFIX_FOUNDATION = format("%s", local.terraform_foundation_state_prefix)
+    _TAG               = local.terraform_container_version
+    _TFVARS_FILE       = local.included_files
+    _WORKSPACE         = each.value
+  }
+}

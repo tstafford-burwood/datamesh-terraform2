@@ -1,0 +1,17 @@
+#--------------------------------
+# PUB/SUB GCS NOTIFICATION MODULE
+#--------------------------------
+
+module "gcs_pub_sub_notification" {
+  source = "./modules/pub_sub/pub_sub_gcs_notification"
+
+  // REQUIRED
+  bucket_name    = var.bucket_name
+  payload_format = var.payload_format
+  pub_sub_topic  = var.pub_sub_topic
+
+  // OPTIONAL
+  custom_attributes  = var.custom_attributes
+  event_types        = var.event_types
+  object_name_prefix = var.object_name_prefix
+}

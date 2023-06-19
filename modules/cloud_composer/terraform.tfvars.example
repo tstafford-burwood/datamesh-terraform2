@@ -1,0 +1,43 @@
+#-----------------------
+# CLOUD COMPOSER TFVARS
+#-----------------------
+
+// REQUIRED
+
+composer_env_name = ""
+network           = ""
+project_id        = ""
+subnetwork        = ""
+
+// OPTIONAL
+
+airflow_config_overrides         = {}
+allowed_ip_range                 = {}
+cloud_sql_ipv4_cidr              = ""
+composer_service_account         = ""
+database_machine_type            = ""
+disk_size                        = "50"
+enable_private_endpoint          = false
+env_variables                    = {}
+gke_machine_type                 = "n1-standard-1"
+image_version                    = ""
+labels                           = {}
+master_ipv4_cidr                 = ""
+node_count                       = 3
+oauth_scopes                     = ["https://www.googleapis.com/auth/cloud-platform"]
+pod_ip_allocation_range_name     = ""
+pypi_packages                    = ""
+python_version                   = "3"
+region                           = ""
+service_ip_allocation_range_name = ""
+tags                             = []
+use_ip_aliases                   = false
+web_server_ipv4_cidr             = ""
+web_server_machine_type          = ""
+zone                             = ""
+
+// SHARED VPC SUPPORT
+
+network_project_id = ""
+subnetwork_region  = ""
+

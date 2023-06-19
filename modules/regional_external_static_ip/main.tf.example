@@ -1,0 +1,19 @@
+#-----------------------------------
+# REGIONAL EXTERNAL STATIC IP MODULE
+#-----------------------------------
+
+// FUNCTIONALITY IN THIS MODULE IS ONLY FOR A REGIONAL EXTERNAL STATIC IP
+
+module "regional_external_static_ip" {
+  source = "./modules/regional_external_static_ip"
+
+  // REQUIRED
+  regional_external_static_ip_name = var.regional_external_static_ip_name
+
+  // OPTIONAL
+  regional_external_static_ip_project_id   = var.regional_external_static_ip_project_id
+  regional_external_static_ip_address_type = var.regional_external_static_ip_address_type
+  regional_external_static_ip_description  = var.regional_external_static_ip_description
+  regional_external_static_ip_network_tier = var.regional_external_static_ip_network_tier
+  regional_external_static_ip_region       = var.regional_external_static_ip_region
+}

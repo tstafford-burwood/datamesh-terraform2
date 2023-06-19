@@ -1,0 +1,19 @@
+#---------------------------
+# COMPUTE TPU VM NODE TFVARS
+#---------------------------
+
+// REQUIRED TFVARS
+
+tpu_node_name               = ""
+tpu_node_accelerator_type   = ""
+tpu_node_tensorflow_version = ""
+tpu_node_project_id         = ""
+tpu_node_preemptible        = false
+
+// OPTIONAL TFVARS
+
+tpu_node_description            = "TPU VM Node created with Terraform."
+tpu_node_network                = ""
+tpu_node_use_service_networking = false
+tpu_node_labels                 = {}
+tpu_node_zone                   = ""

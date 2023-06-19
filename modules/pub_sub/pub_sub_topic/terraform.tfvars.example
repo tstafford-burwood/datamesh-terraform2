@@ -1,0 +1,15 @@
+#---------------------
+# PUB/SUB TOPIC TFVARS
+#---------------------
+
+// REQUIRED
+
+topic_name                  = ""
+project_id                  = ""
+allowed_persistence_regions = []
+
+// OPTIONAL
+kms_key_name = ""
+topic_labels = {}
+# schema       = ""
+# encoding     = ""

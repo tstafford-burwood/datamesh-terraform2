@@ -1,0 +1,20 @@
+#-----------------
+# CLOUD DNS TFVARS
+#-----------------
+
+  // REQUIRED TFVARS
+  cloud_dns_domain     = ""
+  cloud_dns_name       = ""
+  cloud_dns_project_id = ""
+
+  // OPTIONAL TFVARS
+  default_key_specs_key              = {}
+  default_key_specs_zone             = {}
+  cloud_dns_description              = ""
+  dnssec_config                      = {}
+  cloud_dns_labels                   = {}
+  private_visibility_config_networks = []
+  cloud_dns_recordsets               = []
+  target_name_server_addresses       = []
+  cloud_dns_target_network           = ""
+  cloud_dns_zone_type                = ""

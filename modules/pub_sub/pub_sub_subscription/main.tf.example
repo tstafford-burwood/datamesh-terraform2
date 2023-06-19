@@ -1,0 +1,34 @@
+#----------------------------
+# PUB/SUB SUBSCRIPTION MODULE
+#----------------------------
+
+module "pub_sub_subscription" {
+  source = "./modules/pub_sub/pub_sub_subscription"
+
+  // REQUIRED
+
+  subscription_name = var.subscription_name
+  project_id        = var.project_id
+  topic_name        = var.topic_name
+
+  // OPTIONAL
+
+  ack_deadline_seconds       = var.ack_deadline_seconds
+  dead_letter_topic          = var.dead_letter_topic
+  enable_message_ordering    = var.enable_message_ordering
+  expiration_policy_ttl      = var.expiration_policy_ttl
+  filter                     = var.filter
+  maximum_backoff            = var.maximum_backoff
+  minimum_backoff            = var.minimum_backoff
+  max_delivery_attempts      = var.max_delivery_attempts
+  message_retention_duration = var.message_retention_duration
+  retain_acked_messages      = var.retain_acked_messages
+  subscription_labels        = var.subscription_labels
+
+  // PUSH CONFIGURATION - OPTIONAL
+
+  audience              = var.audience
+  push_endpoint         = var.push_endpoint
+  push_attributes       = var.push_attributes
+  service_account_email = var.service_account_email
+}

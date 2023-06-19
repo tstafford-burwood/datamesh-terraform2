@@ -1,0 +1,20 @@
+#----------------------
+# PUB/SUB TOPIC MODULE
+#----------------------
+
+module "pub_sub_topic" {
+  source = "./modules/pub_sub/pub_sub_topic"
+
+  // REQUIRED
+
+  topic_name                  = var.topic_name
+  project_id                  = var.project_id
+  allowed_persistence_regions = var.allowed_persistence_regions
+
+  // OPTIONAL
+
+  kms_key_name = var.kms_key_name
+  topic_labels = var.topic_labels
+# schema       = var.schema
+# encoding     = var.encoding
+}

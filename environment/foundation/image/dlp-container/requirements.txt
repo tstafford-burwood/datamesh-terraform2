@@ -1,0 +1,9 @@
+Flask # ==2.1.2
+gunicorn
+ptvsd==4.3.2 # Required for debugging.
+pytest # ==7.1.2
+google-cloud-logging # ==2.4.0
+google-cloud-storage # ==1.44.0
+# google-cloud # ==0.34.0
+# google
+# protobuf

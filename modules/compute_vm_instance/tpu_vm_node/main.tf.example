@@ -1,0 +1,23 @@
+#--------------------
+# COMPUTE TPU VM NODE
+#--------------------
+
+module "tpu_node" {
+  source = "./modules/compute_vm_instance/tpu_vm_node"
+
+  // REQUIRED
+
+  tpu_node_name               = var.tpu_node_name
+  tpu_node_accelerator_type   = var.tpu_node_accelerator_type
+  tpu_node_tensorflow_version = var.tpu_node_tensorflow_version
+  tpu_node_project_id         = var.tpu_node_project_id
+
+  // OPTIONAL
+
+  tpu_node_description            = var.tpu_node_description
+  tpu_node_network                = var.tpu_node_network
+  tpu_node_use_service_networking = var.tpu_node_use_service_networking
+  tpu_node_preemptible            = var.tpu_node_preemptible
+  tpu_node_labels                 = var.tpu_node_labels
+  tpu_node_zone                   = var.tpu_node_zone
+}

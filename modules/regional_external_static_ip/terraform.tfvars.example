@@ -1,0 +1,13 @@
+#-----------------------------------
+# REGIONAL EXTERNAL STATIC IP TFVARS
+#-----------------------------------
+
+// REQUIRED
+regional_external_static_ip_name         = ""
+
+// OPTIONAL
+regional_external_static_ip_project      = ""
+regional_external_static_ip_address_type = ""
+regional_external_static_ip_description  = ""
+regional_external_static_ip_network_tier = ""
+regional_external_static_ip_region       = ""

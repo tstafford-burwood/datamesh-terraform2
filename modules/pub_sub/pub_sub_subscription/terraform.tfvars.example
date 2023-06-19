@@ -1,0 +1,30 @@
+#----------------------------
+# PUB/SUB SUBSCRIPTION TFVARS
+#----------------------------
+
+// REQUIRED TFVARS
+
+subscription_name = ""
+project_id        = ""
+topic_name        = ""
+
+// OPTIONAL TFVARS
+
+ack_deadline_seconds       = 10
+dead_letter_topic          = null
+enable_message_ordering    = true
+expiration_policy_ttl      = ""
+filter                     = null
+maximum_backoff            = null
+minimum_backoff            = null
+max_delivery_attempts      = null
+message_retention_duration = null
+retain_acked_messages      = false
+subscription_labels        = {}
+
+// PUSH CONFIGURATION - OPTIONAL TFVARS
+
+audience              = ""
+push_endpoint         = ""
+push_attributes       = {}
+service_account_email = ""

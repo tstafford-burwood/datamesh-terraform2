@@ -1,0 +1,7 @@
+#-------------------------
+# FOLDER IAM MEMBER TFVARS
+#-------------------------
+
+folder_id       = ""
+iam_role_list   = []
+folder_member   = ""

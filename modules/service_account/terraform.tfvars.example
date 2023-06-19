@@ -1,0 +1,20 @@
+#-----------------------
+# SERVICE ACCOUNT TFVARS
+#-----------------------
+
+// REQUIRED TFVARS
+
+project_id = ""
+
+// OPTIONAL TFVARS
+
+billing_account_id    = ""
+description           = ""
+display_name          = ""
+generate_keys         = false
+grant_billing_role    = false
+grant_xpn_roles       = false
+service_account_names = []
+org_id                = ""
+prefix                = ""
+project_roles         = []
