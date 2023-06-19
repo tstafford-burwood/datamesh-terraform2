@@ -1,0 +1,453 @@
+timeout: 3600s
+
+steps:
+
+# --- Folder Heirarchy
+
+- id: "folder init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/folders'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/folders'
+  ]
+
+- id: "folder tf workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/folders'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "folders apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/folders'
+  args: [
+  'apply',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-auto-approve'
+  ]
+
+
+# --- Cloud Build Triggers
+
+- id: "cb-triggers tf - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/cloudbuild-sde'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$BRANCH_NAME/cloudbuild-sde
+
+- id: "cb-triggers terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/cloudbuild-sde'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "cb-triggers terraform apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/cloudbuild-sde'
+  args: [
+    'apply', '-auto-approve'
+  ]
+
+# --- Data Ingress
+
+- id: "terraform init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ingress
+
+- id: "ingress tf workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "ingress terraform apply - turn off org policy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'apply', '-auto-approve',
+    '-var=enforce=false',
+    '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+- id: "ingress terraform apply - turn on org policy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'apply', '-auto-approve',
+    '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+# --- Imaging Project
+
+- id: "image terraform init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/image'
+  ]
+
+
+- id: "image tf workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+      
+- id: "image terraform apply - turn off org policy"
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/image'
+  args: ['apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=set_disable_sa_create=false',
+    '-auto-approve'
+  ]
+      
+- id: "image terraform apply - turn on org policy"
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/image'
+  args: ['apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-auto-approve'
+  ]
+
+# --- Data Ops
+
+- id: "data-ops project - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ops'
+  ]
+
+- id: "data ops tf workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "data-ops project - turn off org policy apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'apply',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-var=enforce=false',
+  '-auto-approve'
+  ]
+
+# Get data-ops project ID in order to enable the DLP API service agent
+- id: "data-ops project - tf output"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args: [
+  '-c',
+  'terraform output staging_project_id > _STAGING_PROJECT_ID && cat _STAGING_PROJECT_ID'
+  ]
+
+# Need to enable here in order to perform IAM role assignments
+- id: "data-ops project - enable DLP API service agent"
+  name: gcr.io/cloud-builders/gcloud
+  dir: 'environment/foundation/data-ops'
+  entrypoint: "bash"
+  args:
+    - "-c"
+    - |
+        RESPONSE=$(curl -i --request POST \
+        "https://dlp.googleapis.com/v2/projects/$(cat _STAGING_PROJECT_ID)/locations/us-central1/content:inspect" \
+        --header "X-Goog-User-Project: $(cat _STAGING_PROJECT_ID)" \
+        --header "Authorization: Bearer $(gcloud auth print-access-token)" \
+        --header 'Accept: application/json' \
+        --header 'Content-Type: application/json' \
+        --data '{"item":{"value":"google@google.com"}}' \
+        --compressed) \
+    - echo "$$RESPONSE"
+
+- id: "data-ops project - turn on org policy apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'apply',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-auto-approve'
+  ]
+
+# --- Data Lake
+
+- id: "datalake project - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-lake'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-lake'
+  ]
+
+- id: "data lake tf workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-lake'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "datalake project - turn off org policy apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-lake'
+  args: [
+    'apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=false',
+    '-auto-approve'
+  ]
+
+
+- id: "datalake project - turn on org policy apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-lake'
+  args: [
+    'apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-auto-approve'
+  ]
+
+# --- Composer
+
+
+# CLOUD COMPOSER WITH DAGS
+
+- id: "composer init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/cloud-composer'
+  ]
+
+- id: "composer - terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: composer - Terraform Format
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: ['fmt',
+    '-check'
+    ]
+
+- id: composer - terraform Validate
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: ['validate',
+    '-no-color'
+    ]
+
+# First build step: disable any org policies
+# Certain Org Policies cannot be enabled when creating Cloud Composer
+- id: "composer - tf plan - disable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'plan',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=false'
+  ]
+
+- id: "composer - tf apply - disable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=false',
+    '-auto-approve'
+  ]
+
+# ---- [START] READ Data-Ops TFSTATE file
+- id: "data-ops read project - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ops'
+  ]
+
+- id: "data-ops read tf workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "data-ops read terraform export project info"
+# have terraform output project relate info and save to cloud build workspace for next steps
+# if terraform output is not a string, must export as json
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform output -raw logging_bucket_name_list > /workspace/logging_bucket.txt
+        echo "logging bucket is $(cat /workspace/logging_bucket.txt)"
+
+
+- id: "cloud-composer read init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/cloud-composer'
+  ]
+
+- id: "cloud-composer read terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "cloud-composer read terraform export bucket info"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform output -raw dag_bucket_name > /workspace/dag_bucket.txt
+        echo "dag bucket is $(cat /workspace/dag_bucket.txt)"
+
+
+- id: "Enable Audit Logging on DAG bucket"
+  name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        echo "gsutil logging set on -b gs://$(cat /workspace/logging_bucket.txt) $(cat /workspace/dag_bucket.txt)"
+        gsutil logging set on -b gs://$(cat /workspace/logging_bucket.txt) $(cat /workspace/dag_bucket.txt)
+        gsutil logging get $(cat /workspace/dag_bucket.txt)
+
+#---- [END] READ Data-Ops TFSTATE file
+
+# Third build step: enable the org policies
+- id: "tf plan - enable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'plan',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=true'
+  ]
+
+- id: "composer tf apply - enable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=true',
+    '-auto-approve'
+  ]
+
+- id: "tf init - pull state from data-ops"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ops'
+  ]
+
+- id: "tf workspace - pull state from data-ops"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "output file creation - data-ops project"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args: [
+    '-c',
+    'terraform output -json > /workspace/output.json && cat /workspace/output.json'
+  ]
+
+# --- VPC SC
+
+- id: "vpc-sc init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$BRANCH_NAME/vpc-sc
+
+- id: "vpc-sc terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "vpc-sc apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  args: [
+  'apply',
+  '-auto-approve',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  ]
+
+
+# substitutions:
+#   _TFVARS_FILE: terraform

@@ -1,0 +1,115 @@
+# The below steps are if a manual `gcloud build submit` job needs to be run from the `packer-container` directory.
+# $ gcloud builds submit . --config=packer-main-cloudbuild.yaml
+# IAM Roles - Service Usage Admin, Storage Admin, and Cloud Build Editor at the Packer project level.
+# If Resource Location Restriction error occurs create a GCS bucket in packer project as <PROJECT-ID_cloudbuild>
+# Create Artifact Registry called "packer"
+
+# See docs at https://www.packer.io/docs/install/index.html
+
+timeout: 1800s
+
+steps:
+# Which branch to lookup
+- id: "store git branch"
+  name: ubuntu
+  entrypoint: bash
+  args:
+  - -c
+  - |
+      # save git branch to persistent volume: /workspace
+      echo "Current branch name is $BRANCH_NAME"
+      branch=$BRANCH_NAME
+      echo $branch > /workspace/branch.txt
+      echo ""      
+      if [[ "$BRANCH_NAME" == test* ]] || [[ "$BRANCH_NAME" == test ]]; then
+        branch=test
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      elif [[ "$BRANCH_NAME" == main* ]] || [[ "$BRANCH_NAME" == main ]]; then
+        branch=main
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      fi
+
+- id: "terraform init"
+# initialize terraform
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$(cat /workspace/branch.txt)/image
+
+- id: "terraform workspace"
+# select the correct workspace based off the long running branch
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $(cat /workspace/branch.txt) || terraform workspace new $(cat /workspace/branch.txt)
+
+- id: "terraform export project info"
+# have terraform output project relate info and save to cloud build workspace
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform output -raw project_id > /workspace/project_id.txt        
+        echo "project id is $(cat /workspace/project_id.txt)"           
+
+- name: 'gcr.io/cloud-builders/wget'
+  dir: 'environment/foundation/image/packer-container'
+  args: ["https://releases.hashicorp.com/packer/${_PACKER_VERSION}/packer_${_PACKER_VERSION}_linux_amd64.zip"]
+
+- id: build container
+  name: gcr.io/cloud-builders/docker
+  entrypoint: /bin/bash
+  args: 
+  - '-c'
+  - |
+      docker build ./${_PATH_TO_DOCKERFILE} \
+      -t ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:$SHORT_SHA \
+      -t ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:latest \
+      -t ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:${_PACKER_VERSION} \
+      --build-arg PACKER_VERSION=${_PACKER_VERSION} \
+      --build-arg PACKER_VERSION_SHA256SUM=${_PACKER_VERSION_SHA256SUM}
+
+# PUSH THE CONTAINER IMAGE INTO THE ARTIFACT REGISTRY
+# Tag using the SHA from the trigger
+- id: push SHA container
+  name: gcr.io/cloud-builders/docker
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+      docker push ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:$SHORT_SHA
+
+# Tag using `latest`
+- id: push latest TAG container
+  name: gcr.io/cloud-builders/docker
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+       docker push ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:latest
+
+# Tag using `version`
+- id: push version TAG container
+  name: gcr.io/cloud-builders/docker
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+       docker push ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:${_PACKER_VERSION}
+
+# substitutions:
+#   _PACKER_VERSION: 1.8.4
+#   _PACKER_VERSION_SHA256SUM: ba25b84cc4d3541e9a1dcc0b8e1c7c693f1b39a5d129149194eb6b6050ae56c3
+#   _REPO_NAME: packer
+#   _IMAGE_NAME: packer
+#   _PATH_TO_DOCKERFILE: environment/foundation/image/packer-container

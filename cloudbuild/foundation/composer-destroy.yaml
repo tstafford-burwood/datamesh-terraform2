@@ -1,0 +1,41 @@
+timeout: 2700s
+
+steps:
+
+# CLOUD COMPOSER
+
+- id: "composer init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/cloud-composer'
+  ]
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "composer plan destroy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+  'plan',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-destroy'
+  ]
+
+- id: "composer destroy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+  'destroy',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-auto-approve'
+  ]

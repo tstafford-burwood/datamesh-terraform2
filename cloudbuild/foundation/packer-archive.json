@@ -1,0 +1,92 @@
+{
+    "variables": {
+        "project_id": "",
+        "instance_name": "",
+        "source_image_family": "",
+        "SHORT_SHA": "",
+        "service_account_email": "",
+        "region": "",
+        "subnet_name": ""
+    },
+    "builders": [
+      {
+        "type": "googlecompute",
+        "instance_name": "{{ user `instance_name` }}",
+        "machine_type": "n1-standard-4",
+        "disk_size": "50",
+        "project_id": "{{ user `project_id` }}",
+        "source_image_family": "{{ user `source_image_family` }}",
+        "image_name": "packer-data-science-{{ user `SHORT_SHA` }}",
+        "image_family": "packer-data-science",
+        "image_description": "created-with-packer",
+        "labels": {
+          "version": "version1"
+        },
+        "communicator": "ssh",
+        "ssh_username": "ubuntu",
+        "service_account_email": "{{ user `service_account_email` }}",
+        "subnetwork" : "projects/{{ user `project_id` }}/regions/{{ user `region` }}/subnetworks/{{ user `subnet_name` }}",
+        "zone": "{{ user `region` }}-b",
+        "image_storage_locations": ["{{ user `region` }}"],
+        "tags": ["packer"],
+        "use_os_login":false,
+        "enable_secure_boot": true,
+        "enable_vtpm": true,
+        "enable_integrity_monitoring": true,          
+        "scopes": [
+          "https://www.googleapis.com/auth/cloud-platform"
+        ]
+      }
+      ],
+    "provisioners": [
+      {
+        "type": "shell",
+        "inline": [
+          "sudo apt-get update -y",
+          "sudo apt-get upgrade -qq",
+          "curl https://us-central1-apt.pkg.dev/doc/repo-signing-key.gpg | sudo apt-key add - && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -",
+          "echo 'adding entry'",
+          "echo 'deb http://packages.cloud.google.com/apt apt-transport-artifact-registry-stable main' | sudo tee -a /etc/apt/sources.list.d/artifact-registry.list",
+          "sudo apt-get update",
+          "sudo apt install apt-transport-artifact-registry",
+          "echo 'deb ar+https://us-central1-apt.pkg.dev/projects/prod-sde-image-factory-68b6 apt-repo main' | sudo tee -a  /etc/apt/sources.list.d/artifact-registry.list",
+          "sudo apt update",
+          "curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh",
+          "sudo bash add-google-cloud-ops-agent-repo.sh --also-install",
+          "sudo DEBIAN_FRONTEND=noninteractive apt-get -y install xfce4",
+          "sudo apt-get install xfce4-session -y",
+          "sudo apt-get -y install xrdp python3-pip python3-venv firefox r-base gdebi-core libssl3",
+          "sudo wget --quiet https://s3.amazonaws.com/rstudio-ide-build/desktop/jammy/amd64/rstudio-2022.07.3-583-amd64.deb -O rstudio.deb",
+          "sudo apt install ./rstudio.deb -y",
+          "sudo wget --quiet https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb -O google-chrome.deb",
+          "sudo apt install ./google-chrome.deb -y",
+          "sudo wget --quiet https://github.com/GoogleCloudPlatform/gcsfuse/releases/download/v0.41.10/gcsfuse_0.41.10_amd64.deb -O gcsfuse.deb",
+          "sudo apt install ./gcsfuse.deb -y",
+          "sudo snap install code --classic",
+          "sudo snap install google-cloud-cli --classic",
+          "sudo snap install pycharm-community --classic",
+          "sudo snap install squirrelsql evince",
+          "sudo systemctl enable xrdp",
+          "sudo adduser xrdp ssl-cert",
+          "sudo useradd -m -U clientadmin",
+          "sudo usermod -aG ssl-cert clientadmin",
+          "sudo usermod -aG sudo clientadmin",
+          "echo clientadmin:Burw00d! | sudo chpasswd",
+          "sudo apt-get install xubuntu-desktop -y",
+          "echo xfce4-session >~/.xsession",
+          "echo 'PATH=$$PATH:~/.local/bin:/snap/bin:~/anaconda/bin' | sudo tee /etc/profile.d/path_add.sh",
+          "sudo sed -i 's/rdpdr=true/rdpdr=false/g' /etc/xrdp/xrdp.ini",
+          "sudo sed -i 's/cliprdr=true/cliprdr=false/g' /etc/xrdp/xrdp.ini",
+          "sudo -u clientadmin bash -c 'python3 -m pip install pip wheel --upgrade'",
+          "sudo -u clientadmin bash -c 'python3 -m pip install --user pipx'",
+          "sudo -u clientadmin bash -c 'python3 -m pipx ensurepath'",
+          "sudo -u clientadmin bash -c 'python3 -m pipx install jupyterlab'",
+          "sudo wget --quiet https://repo.anaconda.com/archive/Anaconda3-2022.10-Linux-x86_64.sh -O anaconda.sh",
+          "sudo chmod +x anaconda.sh",
+          "sudo bash anaconda.sh -b -p /home/clientadmin/anaconda",
+          "sudo chown -R clientadmin:clientadmin /home/clientadmin/anaconda",
+          "echo 'deb ar+https://{{ user `region` }}-apt.pkg.dev/projects/{{ user `project_id` }} apt-repo main' | sudo tee -a  /etc/apt/sources.list.d/artifact-registry.list"
+        ]
+      }
+      ]
+    }

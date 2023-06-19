@@ -1,0 +1,85 @@
+steps:
+
+
+# Service Control Perimeter Terraform Plan Prod
+
+# - id: "store git branch"
+#   name: ubuntu
+#   entrypoint: bash
+#   args:
+#   - -c
+#   - |
+#       # save git branch to persistent volume: /workspace
+#       echo "Current branch name is $BRANCH_NAME"
+#       echo ""
+#       if [[ "$BRANCH_NAME" != "test" ]] || [[ "$BRANCH_NAME" != "main" ]]; then
+#         branch=test
+#         echo "Branch Name is now $branch"
+#         echo $branch > /workspace/branch.txt
+#       fi
+
+- id: "vpc-sc init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$BRANCH_NAME/vpc-sc
+        #terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$(cat /workspace/branch.txt)/vpc-sc
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+        #terraform workspace select $(cat /workspace/branch.txt) || terraform workspace new $(cat /workspace/branch.txt)
+
+- id: Terraform Format
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/vpc-sc/'
+  args: ['fmt',
+    '-check'
+    ]
+
+- id: Terraform Validate
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/vpc-sc/'
+  args: ['validate',
+    '-no-color'
+    ]
+
+- id: "vpc-sc plan destroy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  args: [
+  'plan',
+  '-destroy',
+  '-var-file=./env/${_TFVARS_FILE}.tfvars'
+  ]
+
+- id: "vpc-sc destroy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  args: [
+  'destroy',
+  '-auto-approve',
+  '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+- id: "scp perimeter list"
+  name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+      gcloud access-context-manager perimeters list --policy=1234567890
+
+
+timeout: 3600s
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,17 @@
+steps:
+# - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+#   entrypoint: 'gcloud'
+#   args: ['components', 'list', '--only-local-state']
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+  dir: cloudbuild/foundation
+  script: |
+    pwd
+    pip3 install -r requirements.txt --user
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+  dir: cloudbuild/foundation
+  script: python3 call-cloud-run.py
+  env: [
+    "SERVICE_ACCOUNT=$_SERVICE_ACCOUNT",
+    "TARGET_AUDIENCE=$_TARGET_AUDIENCE",
+    "URL=$_URL"
+    ]

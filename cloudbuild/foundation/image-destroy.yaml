@@ -1,0 +1,41 @@
+steps:
+
+# PACKER PROJECT
+
+- id: "image project - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/image'
+  ]
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "image project - destroy plan"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  args: [
+    'plan',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-destroy'
+  ]
+
+- id: "image project - destroy apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  args: [
+  'destroy',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-auto-approve'
+  ]
+
+timeout: 3600s

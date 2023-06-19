@@ -1,0 +1,70 @@
+
+# Copy all the *.py files from the repo to the DAGs GCS Bucket
+# Pull the tfstate to get the correct DAG bucket with the correct environment.
+# Then copy any file ending in *_DAG.py from the repository to the DAG bucket
+
+steps:
+
+- id: "store git branch"
+  name: ubuntu
+  entrypoint: bash
+  args:
+  - -c
+  - |
+      # save git branch to persistent volume: /workspace
+      echo "Current branch name is $BRANCH_NAME"
+      echo ""      
+      if [[ "$BRANCH_NAME" == test* ]] || [[ "$BRANCH_NAME" == test ]]; then
+        branch=test
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      elif [[ "$BRANCH_NAME" == main* ]] || [[ "$BRANCH_NAME" == main ]]; then
+        branch=main
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      fi
+
+- id: "composer init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$(cat /workspace/branch.txt)/cloud-composer
+  
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $(cat /workspace/branch.txt) || terraform workspace new $(cat /workspace/branch.txt)
+
+# Export the DAG bucket name
+- id: "export tfstate"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+  - '-c'
+  - |
+      terraform output -raw gcs_bucket > /workspace/dag_bucket.txt
+      echo "DAG bucket is: " $(cat /workspace/dag_bucket.txt)
+
+# Copy the *.py from the repo to the bucket
+- id: "Copy from repo to DAGs Bucket"
+  name: gcr.io/google.com/cloudsdktool/cloud-sdk:latest
+  dir: 'environment/foundation/data-ops/cloud-composer/composer-dag-files'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        # remove any files that end with *_DAG.py and then copy any files ending with *_DAG.py
+        # first delete because `gsutil` will not overwrite a file if a change has been made
+        # to the file
+        # There are other .py files in the DAGs bucket we don't want to remove like the airflow_monitoring.py so
+        # we need to differentiate our DAGs from the built-in files.
+        gsutil rm -r $(cat /workspace/dag_bucket.txt)/*_DAG.py
+        gsutil -m cp ./*_DAG.py $(cat /workspace/dag_bucket.txt)

@@ -1,0 +1,99 @@
+# If you use deep learning images, Deep learning images are based off of Debian. Have to specify a different project and source iamge
+# https://cloud.google.com/deep-learning-vm/docs/images
+
+timeout: 7200s
+steps:
+# Which branch to use
+- id: "store git branch"
+  name: ubuntu
+  entrypoint: bash
+  args:
+  - -c
+  - |
+      # save git branch to persistent volume: /workspace
+      echo "Current branch name is $BRANCH_NAME"
+      branch=$BRANCH_NAME
+      echo $branch > /workspace/branch.txt     
+      if [[ "$BRANCH_NAME" == test* ]] || [[ "$BRANCH_NAME" == test ]]; then
+        branch=test
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      elif [[ "$BRANCH_NAME" == main* ]] || [[ "$BRANCH_NAME" == main ]]; then
+        branch=main
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      fi
+
+- id: "terraform init"
+# initialize terraform
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$(cat /workspace/branch.txt)/image
+
+- id: "terraform workspace"
+# select the correct workspace based off the long running branch
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $(cat /workspace/branch.txt) || terraform workspace new $(cat /workspace/branch.txt)
+
+- id: "terraform export project info"
+# have terraform output project relate info and save to cloud build workspace for next steps
+# if terraform output is not a string, must export as json
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform output -raw project_id > /workspace/project_id.txt
+        terraform output -raw packer_container_artifact_repo_id > /workspace/repo_id.txt
+        terraform output -json subnets_regions > /workspace/subnets_regions.json
+        terraform output -json subnets_names > /workspace/subnets_names.json
+        terraform output -raw image_build_email > /workspace/image_build_email.txt
+        terraform output -raw image_builder_vm > /workspace/image_builder_vm.txt
+
+        echo "project id is $(cat /workspace/project_id.txt)"
+        echo "repo id is $(cat /workspace/repo_id.txt)"
+        echo "image build sa is $(cat /workspace/image_build_email.txt)"
+        echo "image builder vm is $(cat /workspace/image_builder_vm.txt)"   
+        echo "regions are $(cat /workspace/subnets_regions.json)"
+        echo "subnets json are $(cat /workspace/subnets_names.json)"
+
+- name: dwdraju/alpine-curl-jq
+# JQuery must be used to retrieve value from jq output
+  id: 'use jquery'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        jq -r '.[0]' /workspace/subnets_names.json > /workspace/subnet_name.txt
+        jq -r '.[0]' /workspace/subnets_regions.json > /workspace/subnets_regions.txt
+
+- id: 'VM Build and Image Creation'
+  name: '${_REGION}-docker.pkg.dev/${_IMAGE_PROJECT_ID}/packer/packer:${_PACKER_VERSION}'
+  dir: cloudbuild/foundation
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        packer build -var project_id=${_IMAGE_PROJECT_ID} -var instance_name=$(cat /workspace/image_builder_vm.txt) -var source_image_family=${_IMAGE_FAMILY} -var SHORT_SHA=$SHORT_SHA -var service_account_email=$(cat /workspace/image_build_email.txt) -var region=$(cat /workspace/subnets_regions.txt) -var subnet_name=$(cat /workspace/subnet_name.txt) packer.json
+
+substitutions:
+  _PACKER_VERSION: 1.8.4
+  _IMAGE_FAMILY: ubuntu-2204-lts
+  #_IMAGE_FAMILY: packer-data-science-8223c80
+  _IMAGE_PROJECT_ID: qa-sde-image-factory-a701
+  _REGION: us-central1
+  
+options:
+  machineType: 'N1_HIGHCPU_8' 
+
+# https://cloud.google.com/compute/docs/images/os-details          

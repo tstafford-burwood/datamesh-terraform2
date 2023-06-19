@@ -1,0 +1,84 @@
+steps:
+
+
+# Service Control Perimeter Terraform Plan
+
+# For the TF plan to run, the branch name must be either the long running branch name or prefixed by the long running branch.
+# Ex. If creating a new feature for main/prod -ONLY-, then prefix the branch with `main-feature1`
+
+- id: "store git branch"
+  name: ubuntu
+  entrypoint: bash
+  args:
+  - -c
+  - |
+      # save git branch to persistent volume: /workspace
+      echo "Current branch name is $BRANCH_NAME"
+      echo ""      
+      if [[ "$BRANCH_NAME" == test* ]] || [[ "$BRANCH_NAME" == test ]]; then
+        branch=test
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      elif [[ "$BRANCH_NAME" == main* ]] || [[ "$BRANCH_NAME" == main ]]; then
+        branch=main
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      fi
+
+- id: "vpc-sc init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$(cat /workspace/branch.txt)/vpc-sc
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $(cat /workspace/branch.txt) || terraform workspace new $(cat /workspace/branch.txt)
+
+- id: Terraform Format
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/vpc-sc/'
+  args: ['fmt',
+    '-check'
+    ]
+
+- id: Terraform Validate
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/vpc-sc/'
+  args: ['validate',
+    '-no-color'
+    ]
+
+- id: "vpc-sc plan"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  args: [
+  'plan',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-var=researcher_workspace_name=${_WORKSPACE}'
+  ]
+
+- id: "scp perimeter list"
+  name: 'gcr.io/cloud-builders/gcloud'
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+      gcloud access-context-manager perimeters list --policy=${_POLICY}
+
+timeout: 3600s
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _WORKSPACE: workspace-1
+  _POLICY: "366535258367"

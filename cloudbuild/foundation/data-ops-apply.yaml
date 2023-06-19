@@ -1,0 +1,123 @@
+timeout: 3600s
+
+steps:
+
+- id: "data-ops project - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ops'
+  ]
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: Terraform Format
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ops'
+  args: ['fmt',
+    '-check'
+    ]
+
+- id: Terraform Validate
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ops'
+  args: ['validate',
+    '-no-color'
+    ]
+
+# Turn off any Org Policies set at the project level
+- id: "data-ops project - turn off org policy plan"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'plan',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  #'-target=module.disable_sa_creation',
+  '-var=enforce=false'
+  ]
+
+- id: "data-ops project - turn off org policy apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'apply',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-var=enforce=false',
+  #'-target=module.disable_sa_creation',
+  '-auto-approve'
+  ]
+
+# # Deploy project, but keep org policies off. Turn back on at the very end
+# - id: "data-ops project - plan"
+#   name: hashicorp/terraform:${_TAG}
+#   dir: 'environment/foundation/data-ops'
+#   args: [
+#   'plan',
+#   '-var=enforce=false',
+#   '-var-file=env/${_TFVARS_FILE}.tfvars',
+#   ]
+
+# - id: "data-ops project - apply"
+#   name: hashicorp/terraform:${_TAG}
+#   dir: 'environment/foundation/data-ops'
+#   args: [
+#   'apply',
+#   '-var-file=env/${_TFVARS_FILE}.tfvars',
+#   '-var=enforce=false',
+#   '-auto-approve'
+#   ]
+
+# Get data-ops project ID in order to enable the DLP API service agent
+- id: "data-ops project - tf output"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args: [
+  '-c',
+  'terraform output staging_project_id > _STAGING_PROJECT_ID && cat _STAGING_PROJECT_ID'
+  ]
+
+# Need to enable here in order to perform IAM role assignments
+- id: "data-ops project - enable DLP API service agent"
+  name: gcr.io/cloud-builders/gcloud
+  dir: 'environment/foundation/data-ops'
+  entrypoint: "bash"
+  args:
+    - "-c"
+    - |
+        RESPONSE=$(curl -i --request POST \
+        "https://dlp.googleapis.com/v2/projects/$(cat _STAGING_PROJECT_ID)/locations/us-central1/content:inspect" \
+        --header "X-Goog-User-Project: $(cat _STAGING_PROJECT_ID)" \
+        --header "Authorization: Bearer $(gcloud auth print-access-token)" \
+        --header 'Accept: application/json' \
+        --header 'Content-Type: application/json' \
+        --data '{"item":{"value":"google@google.com"}}' \
+        --compressed) \
+    - echo "$$RESPONSE"
+
+# Turn on any Org Policies
+- id: "data-ops project - turn on org policy plan"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'plan',
+  '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+- id: "data-ops project - turn on org policy apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'apply',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  '-auto-approve'
+  ]

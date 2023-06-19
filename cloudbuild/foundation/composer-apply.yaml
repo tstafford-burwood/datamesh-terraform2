@@ -1,0 +1,178 @@
+steps:
+
+# CLOUD COMPOSER WITH DAGS
+
+- id: "composer init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/cloud-composer'
+  ]
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: Terraform Format
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: ['fmt',
+    '-check'
+    ]
+
+- id: Terraform Validate
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: ['validate',
+    '-no-color'
+    ]
+
+# First build step: disable any org policies
+# Certain Org Policies cannot be enabled when creating Cloud Composer
+- id: "tf plan - disable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'plan',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=false'
+  ]
+
+- id: "tf apply - disable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=false',
+    '-auto-approve'
+  ]
+
+# ---- [START] READ Data-Ops TFSTATE file
+- id: "data-ops read project - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ops'
+  ]
+
+- id: "data-ops read  tf workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "data-ops read terraform export project info"
+# have terraform output project relate info and save to cloud build workspace for next steps
+# if terraform output is not a string, must export as json
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform output -raw logging_bucket_name_list > /workspace/logging_bucket.txt
+        echo "logging bucket is $(cat /workspace/logging_bucket.txt)"
+
+
+- id: "cloud-composer read init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+  'init',
+  '-backend-config=bucket=${_BUCKET}',
+  '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/cloud-composer'
+  ]
+
+- id: "cloud-composer readterraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "cloud-composer read terraform export bucket info"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform output -raw dag_bucket_name > /workspace/dag_bucket.txt
+        echo "dag bucket is $(cat /workspace/dag_bucket.txt)"
+
+
+- id: "Enable Audit Logging on DAG bucket"
+  name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        echo "gsutil logging set on -b gs://$(cat /workspace/logging_bucket.txt) $(cat /workspace/dag_bucket.txt)"
+        gsutil logging set on -b gs://$(cat /workspace/logging_bucket.txt) $(cat /workspace/dag_bucket.txt)
+        gsutil logging get $(cat /workspace/dag_bucket.txt)
+
+# ---- [END] READ Data-Ops TFSTATE file
+
+# Third build step: enable the org policies
+- id: "tf plan - enable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'plan',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=true'
+  ]
+
+- id: "composer tf apply - enable project org policies"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops/cloud-composer'
+  args: [
+    'apply',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-var=enforce=true',
+    '-auto-approve'
+  ]
+
+- id: "tf init - pull state from data-ops"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ops'
+  ]
+
+- id: "tf workspace - pull state from data-ops"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "output file creation - data-ops project"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ops'
+  entrypoint: /bin/sh
+  args: [
+    '-c',
+    'terraform output -json > /workspace/output.json && cat /workspace/output.json'
+  ]
+
+timeout: 3600s

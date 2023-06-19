@@ -1,0 +1,38 @@
+# The below steps are if a manual `gcloud build submit` job needs to be run from the `packer-container` directory.
+# $ gcloud builds submit . --config=packer-main-cloudbuild.yaml
+# IAM Roles - Service Usage Admin, Storage Admin, and Cloud Build Editor at the Packer project level.
+# If Resource Location Restriction error occurs create a GCS bucket in packer project as <PROJECT-ID_cloudbuild>
+# Create Artifact Registry called "packer"
+
+# See docs at https://www.packer.io/docs/install/index.html
+
+
+
+timeout: 1800s
+
+steps:
+- id: "image project state pull - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/image'
+  ]
+
+- id: output file creation - image project
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args: [
+    '-c',
+    'terraform output project_id > /workspace/project_id.txt'
+  ]
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:latest'
+  dir: 'cloudbuild/foundation'
+  entrypoint: /bin/sh
+  args: [
+    '-c',
+    'gcloud builds submit --config=image-container.yaml --substitutions=_IMAGE_PROJECT_ID=$(cat /workspace/project_id.txt),_REGION=${_REGION} .'
+  ]

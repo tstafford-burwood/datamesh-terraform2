@@ -1,0 +1,74 @@
+steps:
+
+# DATA INGRESS
+
+- id: "terraform init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ingress
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: Terraform Format
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ingress'
+  args: ['fmt',
+    '-check'
+    ]
+
+- id: Terraform Validate
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/data-ingress'
+  args: ['validate',
+    '-no-color'
+    ]
+
+- id: "terraform plan - turn off org policy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'plan',
+    '-var=enforce=false',
+    '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+- id: "terraform apply - turn off org policy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'apply', '-auto-approve',
+    '-var=enforce=false',
+    '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+- id: "terraform plan - turn on org policy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'plan',
+    '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+- id: "terraform apply - turn on org policy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'apply', '-auto-approve',
+    '-var-file=env/${_TFVARS_FILE}.tfvars'
+  ]
+
+timeout: 3600s
+
+substitutions:
+  _TFVARS_FILE: terraform

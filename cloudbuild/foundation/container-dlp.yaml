@@ -1,0 +1,94 @@
+timeout: 3600s
+
+steps:
+# Which branch to lookup
+- id: "store git branch"
+  name: ubuntu
+  entrypoint: bash
+  args:
+  - -c
+  - |
+      # save git branch to persistent volume: /workspace
+      echo "Current branch name is $BRANCH_NAME"
+      echo ""      
+      if [[ "$BRANCH_NAME" == test* ]] || [[ "$BRANCH_NAME" == test ]]; then
+        branch=test
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      elif [[ "$BRANCH_NAME" == main* ]] || [[ "$BRANCH_NAME" == main ]]; then
+        branch=main
+        echo "Branch Name is now $branch"
+        echo $branch > /workspace/branch.txt
+      fi
+
+- id: "terraform init"
+# initialize terraform
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$(cat /workspace/branch.txt)/image
+
+- id: "terraform workspace"
+# select the correct workspace based off the long running branch
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $(cat /workspace/branch.txt) || terraform workspace new $(cat /workspace/branch.txt)
+
+- id: "terraform export project info"
+# have terraform output project relate info and save to cloud build workspace
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/image'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform output -raw project_id > /workspace/project_id.txt
+        echo "project id is $(cat /workspace/project_id.txt)"
+
+
+# Install dependencies
+- name: python
+  entrypoint: pip
+  dir: environment/foundation/image/dlp-container
+  args: ["install", "-r", "requirements.txt", "--user"]
+
+- id: build container
+  name: gcr.io/cloud-builders/docker
+  entrypoint: /bin/bash
+  args: 
+  - '-c'
+  - |
+      docker build ./${_PATH_TO_DOCKERFILE} \
+      -t ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:$SHORT_SHA \
+      -t ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:latest
+
+# PUSH THE CONTAINER IMAGE INTO THE ARTIFACT REGISTRY
+# Tag using the SHA from the trigger
+- id: push SHA container
+  name: gcr.io/cloud-builders/docker
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+      docker push ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:$SHORT_SHA
+
+
+# Tag using `latest`
+- id: push latest TAG container
+  name: gcr.io/cloud-builders/docker
+  entrypoint: /bin/bash
+  args:
+  - '-c'
+  - |
+       docker push ${_REGION}-docker.pkg.dev/$(cat /workspace/project_id.txt)/${_REPO_NAME}/${_IMAGE_NAME}:latest
+
+substitutions:
+  _REGION: us-central1
+  _IMAGE_NAME: google-dlp

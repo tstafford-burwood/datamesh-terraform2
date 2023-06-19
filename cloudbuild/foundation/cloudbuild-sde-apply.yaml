@@ -1,0 +1,57 @@
+steps:
+
+# CLOUD BUILD SERVICE ACCOUNT IAM ROLES
+
+- id: "terraform init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/cloudbuild-sde'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/cloudbuild-sde'
+  ]
+
+- id: "cb-triggers terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/cloudbuild-sde'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "terraform plan"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/cloudbuild-sde'
+  args: [
+    'plan',
+    '-target=google_cloudbuild_trigger.composer_apply_triggers',
+    '-target=google_cloudbuild_trigger.composer_plan_triggers',
+    '-target=google_cloudbuild_trigger.workflow_apply_triggers',
+    '-target=google_cloudbuild_trigger.workflow_plan_triggers',
+    '-target=google_cloudbuild_trigger.packer_container_image',
+    '-target=google_cloudbuild_trigger.researcher_vm_image',
+    '-target=google_cloudbuild_trigger.copy_dags',
+    '-target=module.folder_iam_member',
+    '-out=plan.tfplan'
+  ]
+
+- id: "terraform apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/cloudbuild-sde'
+  args: [
+    'apply',
+    # '-target=google_cloudbuild_trigger.composer_apply_triggers',
+    # '-target=google_cloudbuild_trigger.composer_plan_triggers',
+    # '-target=google_cloudbuild_trigger.workflow_apply_triggers',
+    # '-target=google_cloudbuild_trigger.workflow_plan_triggers',
+    # '-target=google_cloudbuild_trigger.packer_container_image',
+    # '-target=google_cloudbuild_trigger.researcher_vm_image',
+    # '-target=google_cloudbuild_trigger.copy_dags',
+    # '-target=module.folder_iam_member',
+    '-auto-approve',
+    '-input=false',
+    'plan.tfplan'
+  ]
+
+timeout: 1800s

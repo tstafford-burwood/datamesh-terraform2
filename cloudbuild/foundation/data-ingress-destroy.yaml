@@ -1,0 +1,41 @@
+steps:
+
+# DATA LAKE PROJECT
+
+- id: "data-ingress project - init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'init',
+    '-backend-config=bucket=${_BUCKET}',
+    '-backend-config=prefix=${_PREFIX}/$BRANCH_NAME/data-ingress'
+  ]
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+- id: "data-ingress project - plan"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'plan',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-destroy'
+  ]
+
+- id: "data-ingress project - destroy"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/data-ingress'
+  args: [
+    'destroy',
+    '-var-file=env/${_TFVARS_FILE}.tfvars',
+    '-auto-approve'
+  ]
+
+timeout: 3600s

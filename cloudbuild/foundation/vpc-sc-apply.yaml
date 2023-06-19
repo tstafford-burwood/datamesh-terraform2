@@ -1,0 +1,58 @@
+steps:
+
+
+# Service Control Perimeter Terraform Plan Prod
+
+- id: "vpc-sc init"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform init -backend-config=bucket=${_BUCKET} -backend-config=prefix=${_PREFIX}/$BRANCH_NAME/vpc-sc
+
+- id: "terraform workspace"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  entrypoint: /bin/sh
+  args:
+    - '-c'
+    - |
+        terraform workspace select $BRANCH_NAME || terraform workspace new $BRANCH_NAME
+
+
+- id: Terraform Format
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/vpc-sc/'
+  args: ['fmt',
+    '-check'
+    ]
+
+- id: Terraform Validate
+  name: 'hashicorp/terraform:${_TAG}'
+  dir: 'environment/foundation/vpc-sc/'
+  args: ['validate',
+    '-no-color'
+    ]
+
+- id: "vpc-sc plan"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  args: [
+  'plan',
+  '-var-file=env/${_TFVARS_FILE}.tfvars'
+  #'-var=researcher_workspace_name=${_WORKSPACE}'
+  ]
+
+- id: "vpc-sc apply"
+  name: hashicorp/terraform:${_TAG}
+  dir: 'environment/foundation/vpc-sc/'
+  args: [
+  'apply',
+  '-auto-approve',
+  '-var-file=env/${_TFVARS_FILE}.tfvars',
+  #'-var=researcher_workspace_name=${_WORKSPACE}'
+  ]
+
+timeout: 3600s
